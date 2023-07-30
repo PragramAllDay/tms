@@ -7,41 +7,57 @@ import { getAccount } from "@wagmi/core";
 import MerkleTree from "merkletreejs";
 import keccak256 from "keccak256";
 import useReadContract from "../hook/useReadContract";
-
-const whiteListedAddress = [
-  { address: "0x33213333332320002ds22123333344rfd3235353", balance: 10000 },
-  { address: "0xd057C25E4Ef0f8B5f2809e452A958999EAEbc766", balance: 10000 },
-  { address: "0x332133333323200022222123333344rfdd214452", balance: 10020 },
-  { address: "0x33d1d333332320002222212sd33344rfd2325461", balance: 10000 },
-  { address: "0x332133333323200122222123333344rfddd12333", balance: 10000 },
-  { address: "0x332133333323200022222123333344rfdfdt3431", balance: 10000 },
-  { address: "0x332133333323200022222123333344rfd22123r2", balance: 120000 },
-  { address: "0x3321333333232000222221w2333334rf1223321d", balance: 90000 },
-];
+import { whiteListedUsers } from "../config/Array";
+import { ethers } from "ethers";
+import {
+  useContractRead,
+  useContractWrite,
+  usePrepareContractWrite,
+  useWaitForTransaction,
+} from "wagmi";
+import { CONFIG } from "../config/config";
+import VestingAbi from "../config/Vesting.json";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { parseEther, formatUnits } from "viem";
 
 function Claim() {
   const [count, setCount] = useState(0);
-  const account = getAccount();
+  const { address, isConnected, status } = getAccount();
   const [stage, setStage] = useState();
-  const leafNodes = whiteListedAddress.map((item) => keccak256(item.address));
-  const merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
+  const [reloadDta, setReloadDta] = useState(false);
+
+  //encode the data
+  function encodeItem(item) {
+    return ethers.utils.defaultAbiCoder.encode(
+      ["address", "uint256"],
+      [item.address.toLowerCase(), parseInt(item.balance)]
+    );
+  }
+  // create leaf nodes
+  const leafNodes = whiteListedUsers.map((item) => encodeItem(item));
+  //  create merkle tree
+  const merkleTree = new MerkleTree(leafNodes, keccak256, {
+    hashLeaves: true,
+    sortPairs: true,
+  });
+  // get the root
   const root = merkleTree.getHexRoot();
-  const proof = merkleTree.getHexProof(keccak256(account.address));
-  const verify = merkleTree.verify(proof, keccak256(account.address), root);
-  const claimingAddress = account.address;
+  // get the index of the account
+  const index = whiteListedUsers.findIndex((object) => {
+    return object.address === address;
+  });
 
-  // fetch data from the api
+  // get the proof
+  let proof;
+  proof = merkleTree.getHexProof(keccak256(leafNodes[index]));
+  // verify the proof
+  const verify = merkleTree.verify(proof, keccak256(leafNodes[index]), root);
 
-  const data = useReadContract();
-  useEffect(() => {
-    console.log(data);
-  }, [data]);
-  // consoles
-  console.log("account", account);
-  console.log("root", root);
-  console.log("proof", proof);
-  console.log("verify", verify);
-  console.log("claimingAddress", claimingAddress);
+  // fetch data
+  const dataC = useReadContract();
+
+  // console.log("claimingAddress", claimingAddress);
 
   // check if the screen size is less than 768px then set isMobile to true else false
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -61,9 +77,149 @@ function Claim() {
   useEffect(() => {
     console.log(stage);
   }, [stage]);
+  // get the balance of the user
+  const [balance, setBalance] = useState(0);
+  useEffect(() => {
+    setBalance(0);
+    let ad = whiteListedUsers.map((item) => item.address).includes(address);
+    console.log(ad);
+    if (address && ad) {
+      setBalance(
+        whiteListedUsers.find((item) => item.address === address).balance
+      );
+    }
+    console.log(balance);
+  }, [address, isConnected]);
+
+  // get if verified from the contract =========================
+  const { data: ifVerified } = useContractRead({
+    address: CONFIG.VESTING_CONTRACT,
+    abi: VestingAbi,
+    functionName: "verifyInWhitelist",
+    args: [proof, address, parseInt(balance)],
+    onError(err) {
+      console.log(err);
+    },
+  });
+  console.log(address && ifVerified);
+
+  // ===========================================================
+
+  // get vesting logs from the contract =========================
+  const { data: vestingLogs, refetch } = useContractRead({
+    address: CONFIG.VESTING_CONTRACT,
+    abi: VestingAbi,
+    functionName: "vestingLogs",
+    args: [address],
+  });
+  console.log(vestingLogs);
+
+  // can claim
+  const { data: canClaim, refetch: refetchClaim } = useContractRead({
+    address: CONFIG.VESTING_CONTRACT,
+    abi: VestingAbi,
+    functionName: "canClaim",
+    args: [address],
+  });
+  console.log(canClaim);
+
+  // ===========================================================
+  // write to contract ==========================================
+  // ===== prepare config for the contract write =======
+  const finalBalance = parseInt(balance).toString();
+  console.log("finalBalance", finalBalance);
+  const grandFinal = parseEther(finalBalance);
+  console.log("grandFinal", grandFinal);
+  console.log("balance", balance);
+
+  // claim function
+  const { data, write } = useContractWrite({
+    enabled: false,
+    address: CONFIG.VESTING_CONTRACT,
+    abi: VestingAbi,
+    functionName: "getClaim",
+    args: [address, proof, parseInt(balance)],
+    onError(err) {
+      toast.error(err.message);
+    },
+  });
+  const { isLoading, isSuccess } = useWaitForTransaction({
+    hash: data?.hash,
+    onSuccess(data) {
+      toast.success("Transaction successful");
+    },
+    onError(error) {
+      toast.error(error.message);
+    },
+  });
+  // ==================================================
+
+  // const { data: returnData, write: claim } = useContractWrite({
+  //   ...config,
+  //   onError(err) {
+  //     toast.error(err.message);
+  //   },
+  // });
+  // const { isLoading, isSuccess } = useWaitForTransaction({
+  //   hash: data?.hash,
+  //   onSuccess(data) {
+  //     toast.success("Transaction successful");
+  //   },
+  //   onError(error) {
+  //     toast.error(error.message);
+  //   },
+  // });
+  // ============================================================
+  // handle the claim ================================================
+  const handleClaim = () => {
+    if (address === undefined || address === null) {
+      toast.error("Please connect your wallet");
+    } else {
+      if (!verify) {
+        toast.error("You are not in the whitelist");
+      } else {
+        if (!canClaim) {
+          toast.error("You can't claim for one week after your latest claim");
+        } else {
+          if (stage === undefined) {
+            toast.error("Please select a stage");
+          } else {
+            write();
+          }
+        }
+      }
+    }
+  };
+  // =================================================================
+
+  console.log("isSuccess", isSuccess);
+  console.log("address", address);
+  console.log("root", root);
+  useEffect(() => {
+    if (isSuccess) {
+      refetch();
+    }
+  }, [isSuccess]);
+  useEffect(() => {
+    if (window.ethereum) {
+      window.ethereum.on("chainChanged", () => {
+        window.location.reload();
+      });
+      window.ethereum.on("accountsChanged", () => {
+        setReloadDta(!reloadDta);
+      });
+    }
+  });
+
+  useEffect(() => {
+    if (address) {
+      refetch();
+    }
+  }, [reloadDta]);
 
   return (
     <>
+      <ToastContainer />
       <Box width="100vw" height="100%">
         <Nav />
         <Box
@@ -88,7 +244,11 @@ function Claim() {
           >
             <CardHeader>Total Supply</CardHeader>
             <hr />
-            <CardBody>0.0</CardBody>
+            <CardBody>
+              {dataC?.data !== undefined
+                ? formatUnits(dataC?.data?.[0].result, 18)
+                : 0}
+            </CardBody>
           </Card>
           <Card
             sx={{
@@ -101,7 +261,29 @@ function Claim() {
           >
             <CardHeader>Total Token Claimed</CardHeader>
             <hr />
-            <CardBody>0.0</CardBody>
+            <CardBody>
+              {isConnected ? (
+                vestingLogs && vestingLogs[0] !== true ? (
+                  0.0
+                ) : (
+                  <>
+                    {vestingLogs !== undefined
+                      ? vestingLogs &&
+                        vestingLogs[0] === true &&
+                        formatUnits(vestingLogs[3], 18).includes(".")
+                        ? formatUnits(vestingLogs[3], 18).split(".")[0] +
+                          "." +
+                          formatUnits(vestingLogs[3], 18)
+                            .split(".")[1]
+                            .slice(0, 2)
+                        : formatUnits(vestingLogs[3], 18)
+                      : 0}
+                  </>
+                )
+              ) : (
+                0.0
+              )}
+            </CardBody>
           </Card>
           <Card
             sx={{
@@ -114,7 +296,29 @@ function Claim() {
           >
             <CardHeader>No of Tokens to be Claimed</CardHeader>
             <hr />
-            <CardBody>0.0</CardBody>
+            <CardBody>
+              {isConnected ? (
+                vestingLogs && vestingLogs[0] !== true ? (
+                  <>{balance && parseInt(balance)}</>
+                ) : (
+                  <>
+                    {vestingLogs !== undefined
+                      ? vestingLogs &&
+                        vestingLogs[0] === true &&
+                        formatUnits(vestingLogs[2], 18).includes(".")
+                        ? formatUnits(vestingLogs[2], 18).split(".")[0] +
+                          "." +
+                          formatUnits(vestingLogs[2], 18)
+                            .split(".")[1]
+                            .slice(0, 2)
+                        : formatUnits(vestingLogs[2], 18)
+                      : 0}
+                  </>
+                )
+              ) : (
+                0.0
+              )}
+            </CardBody>
           </Card>
         </Box>
         <Box
@@ -153,12 +357,12 @@ function Claim() {
                   }}
                   onChange={(e) => setStage(e.target.value)}
                 >
-                  <option value="option1">Stage 1</option>
-                  <option value="option2">Stage 2</option>
-                  <option value="option3">Stage 3</option>
-                  <option value="option3">Stage 4</option>
-                  <option value="option3">Stage 5</option>
-                  <option value="option3">Stage 6</option>
+                  <option value="1">Stage 1</option>
+                  <option value="2">Stage 2</option>
+                  <option value="3">Stage 3</option>
+                  <option value="4">Stage 4</option>
+                  <option value="5">Stage 5</option>
+                  <option value="6">Stage 6</option>
                 </Select>
               </Box>
             </CardHeader>
@@ -177,7 +381,7 @@ function Claim() {
               </Tag>
               <Input
                 disabled
-                placeholder={account.address}
+                placeholder={isConnected ? address : null}
                 sx={{
                   height: "3rem",
                   width: "100%",
@@ -186,7 +390,12 @@ function Claim() {
                 }}
               ></Input>
 
-              <Button variant="brandPrimary" width="100%" height="10">
+              <Button
+                variant="brandPrimary"
+                width="100%"
+                height="10"
+                onClick={handleClaim}
+              >
                 Claim
               </Button>
             </CardBody>

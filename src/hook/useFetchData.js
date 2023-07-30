@@ -5,28 +5,25 @@ import TestTokenAbi from "../config/TestTokenAbi.json";
 import { useContractReads } from "wagmi";
 import { getAccount } from "@wagmi/core";
 
-const tokenContract = {
-  address: CONFIG.TEST_TOKEN,
-  abi: TestTokenAbi,
-};
 const vestingContract = {
   address: CONFIG.VESTING_CONTRACT,
   abi: VestingAbi,
 };
 
-const useReadContract = () => {
+const useFetchData = (address) => {
   const account = getAccount();
   const data = useContractReads({
     contracts: [
       {
-        ...tokenContract,
-        functionName: "totalSupply",
-      },
-      {
         ...vestingContract,
         functionName: "vestingLogs",
-        args: [account.address],
+        args: [address],
       },
+      //   {
+      //     ...vestingContract,
+      //     functionName: "verifyInWhitelist",
+      //     args: [proof, address, amount],
+      //   },
     ],
     onSuccess(data) {
       console.log("data", data);
@@ -38,4 +35,4 @@ const useReadContract = () => {
   return data;
 };
 
-export default useReadContract;
+export default useFetchData;
