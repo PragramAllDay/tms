@@ -20,6 +20,7 @@ import VestingAbi from "../config/Vesting.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { parseEther, formatUnits } from "viem";
+import { Spinner } from "@chakra-ui/react";
 
 function Claim() {
   const [count, setCount] = useState(0);
@@ -121,7 +122,7 @@ function Claim() {
     functionName: "canClaim",
     args: [address],
   });
-  console.log(canClaim);
+  console.log("can Claim", canClaim);
 
   // ===========================================================
   // write to contract ==========================================
@@ -174,23 +175,43 @@ function Claim() {
   const handleClaim = () => {
     if (address === undefined || address === null) {
       toast.error("Please connect your wallet");
-    } else {
-      if (!verify) {
-        toast.error("You are not in the whitelist");
+    } else if (verify) {
+      if (stage === undefined) {
+        toast.error("Please select a stage");
       } else {
-        if (!canClaim) {
-          toast.error("You can't claim for one week after your latest claim");
-        } else {
-          if (stage === undefined) {
-            toast.error("Please select a stage");
-          } else {
+        if (vestingLogs[0] === true) {
+          if (canClaim) {
             write();
+          } else {
+            toast.error("You can't claim for one week after your latest claim");
           }
+        } else {
+          write();
         }
       }
+    } else {
+      toast.error("You are not in the whitelist");
     }
   };
   // =================================================================
+
+  // if (address === undefined || address === null) {
+  //   toast.error("Please connect your wallet");
+  // } else {
+  //   if (!verify) {
+  //     toast.error("You are not in the whitelist");
+  //   } else {
+  //     if (stage === undefined) {
+  //       toast.error("Please select a stage");
+  //     } else {
+  //       if (!canClaim) {
+  //         toast.error("You can't claim for one week after your latest claim");
+  //       } else {
+  //         write();
+  //       }
+  //     }
+  //   }
+  // }
 
   console.log("isSuccess", isSuccess);
   console.log("address", address);
@@ -396,7 +417,7 @@ function Claim() {
                 height="10"
                 onClick={handleClaim}
               >
-                Claim
+                {isLoading ? <Spinner /> : "Claim"}
               </Button>
             </CardBody>
           </Card>
