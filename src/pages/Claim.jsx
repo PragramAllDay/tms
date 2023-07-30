@@ -15,6 +15,7 @@ import {
   usePrepareContractWrite,
   useWaitForTransaction,
 } from "wagmi";
+import { useAccount } from "wagmi";
 import { CONFIG } from "../config/config";
 import VestingAbi from "../config/Vesting.json";
 import { ToastContainer, toast } from "react-toastify";
@@ -25,6 +26,7 @@ import { Spinner } from "@chakra-ui/react";
 function Claim() {
   const [count, setCount] = useState(0);
   const { address, isConnected, status } = getAccount();
+
   const [stage, setStage] = useState();
   const [reloadDta, setReloadDta] = useState(false);
 
@@ -229,6 +231,9 @@ function Claim() {
       window.ethereum.on("accountsChanged", () => {
         setReloadDta(!reloadDta);
       });
+      window.ethereum.on("connect", () => {
+        setReloadDta(!reloadDta);
+      });
     }
   });
 
@@ -236,7 +241,13 @@ function Claim() {
     if (address) {
       refetch();
     }
-  }, [reloadDta]);
+  }, [reloadDta, isConnected]);
+  const account = useAccount({
+    onConnect({ address, connector, isReconnected }) {
+      console.log("Connected", { address, connector, isReconnected });
+      refetch();
+    },
+  });
 
   return (
     <>
