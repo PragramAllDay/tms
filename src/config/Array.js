@@ -1,41 +1,5 @@
 export const whiteListedUsers = [
   {
-    address: "0x2a5724925AafD52E84d4ce05C6138007dad2c661",
-    balance: 1000,
-  },
-  {
-    address: "0x9192124c9dB680Bb5D2951b2e3081a051240DfA1",
-    balance: 1000,
-  },
-  {
-    address: "0x5E3C5007F8497f5c33c5aeeAe23C2f4D5b588222",
-    balance: 1000,
-  },
-  {
-    address: "0xAaE7D6542164E7Ff1eFeE30Dcb5D0E67B7f9282C",
-    balance: 1000,
-  },
-  {
-    address: "0x5baA0f14D09864929c5fC8AbDfDc466dcb72be9d",
-    balance: 1000,
-  },
-  {
-    address: "0xE0b45A6C2B6f063Ec083Cfc44cc40d9517DcbDd3",
-    balance: 1000,
-  },
-  {
-    address: "0x59305A0CDee7525940FFA0F42fFb011FFE9D70Fc",
-    balance: 1000,
-  },
-  {
-    address: "0xD109fc566401ca57445810b9A3C187876cf44544",
-    balance: 1000,
-  },
-  {
-    address: "0xC65Ff85d0A576349AD5fd0A01208685eb2b53224",
-    balance: 1000000,
-  },
-  {
     address: "0x2d831b1548a475Ba269470C1628138f515fBD3c6",
     balance: 46054318,
   },

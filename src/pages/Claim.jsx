@@ -26,7 +26,6 @@ import { Spinner } from "@chakra-ui/react";
 function Claim() {
   const [count, setCount] = useState(0);
   const { address, isConnected, status } = getAccount();
-
   const [stage, setStage] = useState();
   const [reloadDta, setReloadDta] = useState(false);
 
@@ -46,6 +45,7 @@ function Claim() {
   });
   // get the root
   const root = merkleTree.getHexRoot();
+  console.log("root ==> ", root)
   // get the index of the account
   const index = whiteListedUsers.findIndex((object) => {
     return object.address === address;
@@ -439,3 +439,5 @@ function Claim() {
 }
 
 export default Claim;
+
+0x956b9461f29242ccaa7358f1e3c52cf80e6e2ae003ecf6ea0ab79a490b6b70ff
